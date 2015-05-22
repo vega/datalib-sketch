@@ -1,0 +1,5 @@
+test/
+.DS_Store
+temp
+index.html
+publish.sh

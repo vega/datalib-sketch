@@ -1,0 +1,40 @@
+{
+  "name": "datalib-sketch",
+  "version": "0.0.1",
+  "description": "Probabilistic data structures for large or streaming data sets.",
+  "keywords": [
+    "data",
+    "approximate",
+    "streaming",
+    "sketches",
+    "count-min sketch",
+    "bloom filter"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/uwdata/datalib-sketch.git"
+  },
+  "author": {
+    "name": "UW Interactive Data Lab",
+    "url": "http://idl.cs.washington.edu"
+  },
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "browserify": "^9.0.8",
+    "browserify-shim": "^3.8.5",
+    "chai": "^1.10.0",
+    "gulp": "^3.8.11",
+    "gulp-rename": "^1.2.2",
+    "gulp-spawn-mocha": "^2.0.1",
+    "gulp-uglify": "^1.2.0",
+    "gulp-util": "^3.0.4",
+    "gulp-jshint": "^1.10.0",
+    "mocha": "^2.1.0",
+    "vinyl-buffer": "^1.0.0",
+    "vinyl-source-stream": "^1.1.0"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "test": "gulp test"
+  }
+}
