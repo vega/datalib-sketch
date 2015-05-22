@@ -1,5 +1,8 @@
 # datalib-sketch
 
+[![Build Status](https://travis-ci.org/uwdata/datalib-sketch.svg?branch=master)](https://travis-ci.org/uwdata/datalib-sketch)
+[![npm version](https://img.shields.io/npm/v/datalib-sketch.svg)](https://www.npmjs.com/package/datalib-sketch)
+
 Probabilistic data structures for large or streaming data sets.
 
 ## Build Process

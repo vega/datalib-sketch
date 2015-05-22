@@ -11,7 +11,7 @@ var gulp = require('gulp'),
 function browser() {
   return browserify({
       entries: ['./src/'],
-      standalone: 'dl',
+      standalone: 'dl.sketch',
       debug: true,
       cache: {}, packageCache: {}
     });

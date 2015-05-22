@@ -1,7 +1,7 @@
 'use strict';
 
 var assert = require('chai').assert;
-var CountMeanMin = require('../src/countmeanmin');
+var CountMeanMin = require('../src/count-mean-min');
 var EPSILON = 0.1;
 var width = 1021;
 var depth = 3;

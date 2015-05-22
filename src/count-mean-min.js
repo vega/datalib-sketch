@@ -1,5 +1,10 @@
-var CountMin = require('./CountMin');
+var CountMin = require('./count-min');
 
+// Count-Mean-Min sketch extends Count-Min with improved estimation.
+// See 'New Estimation Algorithms for Streaming Data: Count-min Can Do More'
+// by Deng & Rafiei, http://webdocs.cs.ualberta.ca/~fandeng/paper/cmm.pdf
+// Argument *w* specifies the width (number of row entries) of the sketch.
+// Argument *d* specifies the depth (number of hash functions) of the sketch.
 function CountMeanMin(w, d) {
   CountMin.call(this, w, d);
   this._q = Array(d);

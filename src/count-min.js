@@ -4,6 +4,11 @@ var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined",
     DEFAULT_BINS = 1021,
     DEFAULT_HASH = 3;
 
+// Count-Min sketch for approximate counting of value frequencies.
+// See: 'An Improved Data Stream Summary: The Count-Min Sketch and its
+// Applications' by G. Cormode & S. Muthukrishnan.
+// Argument *w* specifies the width (number of row entries) of the sketch.
+// Argument *d* specifies the depth (number of hash functions) of the sketch.
 function CountMin(w, d) {
   this._w = w || DEFAULT_BINS;
   this._d = d || DEFAULT_HASH;

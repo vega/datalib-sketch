@@ -1,0 +1,28 @@
+{
+  "name": "datalib-sketch",
+  "main": "datalib-sketch.js",
+  "version": "0.0.1",
+  "homepage": "http://github.com/uwdata/datalib-sketch.git",
+  "authors": [
+    "UW Interactive Data Lab (http://idl.cs.washington.edu)"
+  ],
+  "description": "Probabilistic data structures for large or streaming data sets.",
+  "moduleType": [
+    "node"
+  ],
+  "keywords": [
+    "data",
+    "approximate",
+    "streaming",
+    "sketches",
+    "count-min sketch",
+    "bloom filter"
+  ],
+  "license": "BSD-3-Clause",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test"
+  ]
+}
