@@ -49,9 +49,9 @@ proto.query = function(value) {
       l = this.locations(value),
       t = this._table,
       w = this._w,
-      d = this._d, i, v;
-  for (i=0; i<d; ++i) {
-    v = t[i*w + l[i]];
+      d = this._d, i, r, v;
+  for (i=0, r=0; i<d; ++i, r+=w) {
+    v = t[r + l[i]];
     if (v < min) min = v;
   }
   return min;
@@ -60,23 +60,24 @@ proto.query = function(value) {
 // Approximate dot product with another sketch.
 // The input sketch must have the same depth and width.
 // Otherwise, this method will throw an error.
-proto.dot = function(s) {
-  if (s._w !== this._w) throw 'Sketch widths do not match.';
-  if (s._d !== this._d) throw 'Sketch depths do not match.';
+proto.dot = function(that) {
+  if (this._w !== that._w) throw 'Sketch widths do not match.';
+  if (this._d !== that._d) throw 'Sketch depths do not match.';
 
-  var min = +Infinity,
-      ta = this._table,
-      tb = s._table,
-      d = this._d,
+  var ta = this._table,
+      tb = that._table,
       w = this._w,
-      dot, i, j;
+      m = this._d * w,
+      min = +Infinity,
+      dot = 0, i = 0;
 
-  for (i=0; i<d; ++i) {
-    for (dot=0, j=0; j<w; ++j) {
-      dot += ta[i*w+j] * tb[i*w+j];
+  do {
+    dot += ta[i] * tb[i];
+    if (++i % w === 0) {
+      if (dot < min) min = dot;
+      dot = 0;
     }
-    if (dot < min) min = dot;
-  }
+  } while (i < m);
 
   return min;
 };

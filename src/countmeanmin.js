@@ -9,28 +9,61 @@ CountMeanMin.create = CountMin.create;
 
 var proto = (CountMeanMin.prototype = Object.create(CountMin.prototype));
 
+// Query for approximate count.
 proto.query = function(value) {
   var l = this.locations(value),
+      t = this._table,
       q = this._q,
       w = this._w,
       d = this._d,
-      s = this._num / (w-1),
-      t = this._table,
-      c, i, H, h, v, e;
+      n = this._num,
+      s = 1 / (w-1),
+      min = +Infinity, c, i, r;
 
-  for (i=0; i<d; ++i) {
-    c = t[i*w + l[i]];
-    q[i] = c - (s*c);
+  for (i=0, r=0; i<d; ++i, r+=w) {
+    c = t[r + l[i]];
+    if (c < min) min = c;
+    c = c - (n-c) * s;
+    q[i] = c;
   }
 
-  // Compute the median
-  q.sort(numcmp);
-  H = (d - 1) * 0.5 + 1;
-  h = Math.floor(H);
-  v = q[h-1];
-  e = H - h;
-  return e ? v + e * (q[h] - v) : v;
+  return (c = median(q)) < 0 ? 0 : c > min ? min : c;
 };
+
+// Approximate dot product with another sketch.
+// The input sketch must have the same depth and width.
+// Otherwise, this method will throw an error.
+proto.dot = function(that) {
+  if (this._w !== that._w) throw 'Sketch widths do not match.';
+  if (this._d !== that._d) throw 'Sketch depths do not match.';
+
+  var ta = this._table,
+      tb = that._table,
+      q = this._q,
+      w = this._w,
+      n = this._num,
+      m = this._d * w,
+      z = (w - 1) / w,
+      s = 1 / (w-1),
+      dot = 0, i = 0;
+
+  do {
+    dot += (ta[i] - (n-ta[i])*s) * (tb[i] - (n-tb[i])*s);
+    if (++i % w === 0) {
+      q[i/w-1] = z * dot;
+      dot = 0;
+    }
+  } while (i < m);
+
+  return (dot = median(q)) < 0 ? 0 : dot;
+};
+
+function median(q) {
+  q.sort(numcmp);
+  var n = q.length,
+      h = ~~(n/2);
+  return n % 2 ? q[h] : 0.5 * (q[h-1] + q[h]);
+}
 
 function numcmp(a, b) {
   return a - b;

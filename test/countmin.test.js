@@ -3,6 +3,8 @@
 var assert = require('chai').assert;
 var CountMin = require('../src/countmin');
 var EPSILON = 0.1;
+var width = 1021;
+var depth = 3;
 
 describe('count-min sketch', function() {
   var set1 = 'abcdefghij'.split('');
@@ -14,7 +16,8 @@ describe('count-min sketch', function() {
   }
 
   it('should approximately model counts', function() {
-    var cm = new CountMin(1021, 3);
+    var cm = new CountMin(width, depth);
+
     set1.forEach(function(d) { cm.add(d); });
     set1.forEach(function(d) { cm.add(d); });
     set2.forEach(function(d) { cm.add(d); });
@@ -32,9 +35,10 @@ describe('count-min sketch', function() {
   });
 
   it('should dot product', function() {
-    var cm1 = new CountMin(1021, 3);
-    var cm2 = new CountMin(1021, 3);
-    var cm3 = new CountMin(1021, 3);
+    var cm1 = new CountMin(width, depth);
+    var cm2 = new CountMin(width, depth);
+    var cm3 = new CountMin(width, depth);
+
     set1.forEach(function(d) { cm1.add(d); cm2.add(d); });
     set2.forEach(function(d) { cm2.add(d); });
     set3.forEach(function(d) { cm3.add(d); });
@@ -49,11 +53,3 @@ describe('count-min sketch', function() {
   });
 
 });
-
-function nonzero(t) {
-  var n = t.length, i, a = [];
-  for (i=0; i<n; ++i) {
-    if (t[i] > 0) a.push(i);
-  }
-  return a;
-}
