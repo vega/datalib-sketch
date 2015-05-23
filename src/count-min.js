@@ -1,35 +1,56 @@
 var hash = require('./hash');
 
 var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined",
-    DEFAULT_BINS = 1021,
-    DEFAULT_HASH = 3;
+    DEFAULT_BINS = 27191,
+    DEFAULT_HASH = 9;
 
-// Count-Min sketch for approximate counting of value frequencies.
+// Create a new Count-Min sketch for approximate counts of value frequencies.
 // See: 'An Improved Data Stream Summary: The Count-Min Sketch and its
 // Applications' by G. Cormode & S. Muthukrishnan.
-// Argument *w* specifies the width (number of row entries) of the sketch.
+// If argument *w* is an array-like object, with a length property, then the
+// sketch is loaded with data from the array, each element is a 32-bit integer.
+// Otherwise, *w* specifies the width (number of row entries) of the sketch.
 // Argument *d* specifies the depth (number of hash functions) of the sketch.
-function CountMin(w, d) {
-  this._w = w || DEFAULT_BINS;
-  this._d = d || DEFAULT_HASH;
-  this._num = 0;
-  
+// Argument *num* indicates the number of elements add. This should only be
+// provided if *w* is an array, in which case *num* is required.
+function CountMin(w, d, num) {
+  w = w || DEFAULT_BINS;
+  d = d || DEFAULT_HASH;
+
+  var a, t, i=-1, n;
+  if (typeof w !== "number") { a = w; w = a.length / d; }
+  this._w = w;
+  this._d = d;
+  this._num = num || 0;
+  n = w * d;
+
   if (TYPED_ARRAYS) {
-    this._table = new Int32Array(d*w);
+    t = this._table = new Int32Array(n);
+    if (a) while (++i < n) t[i] = a[i];
   } else {
-    var i = -1, n = d*w;
-    this._table = Array(n);
-    while (++i < n) this._table[i] = 0;
+    t = this._table = Array(n);
+    if (a) while (++i < n) t[i] = a[i];
+    while (++i < n) t[i] = 0;
   }
   hash.init.call(this);
 }
 
-CountMin.create = function(accuracy, probability) {
-  accuracy = accuracy || 0.1;
-  probability = probability || 0.0001;
-  var d = Math.ceil(-Math.log(probability)) | 0,
-      w = Math.ceil(Math.E / accuracy) | 0;
+// Create a new Count-Min sketch based on provided performance parameters.
+// Argument *n* is the expected count of all elements
+// Argument *e* is the acceptable absolute error.
+// Argument *p* is the probability of not achieving the error bound.
+// http://dimacs.rutgers.edu/~graham/pubs/papers/cmencyc.pdf
+CountMin.create = function(n, e, p) {
+  e = n ? (e ? e/n : 1/n) : 0.001;
+  p = p || 0.001;
+  var w = Math.ceil(Math.E / e),
+      d = Math.ceil(-Math.log(p));
   return new this(w, d);
+};
+
+// Create a new Count-Min sketch from a serialized object.
+CountMin.import = function(obj) {
+  return new this(obj.counts, obj.depth, obj.num);
 };
 
 var proto = CountMin.prototype;
@@ -37,27 +58,27 @@ var proto = CountMin.prototype;
 proto.locations = hash.locations;
 
 // Add a value to the sketch.
-proto.add = function(value) {
-  var l = this.locations(value),
+proto.add = function(v) {
+  var l = this.locations(v + ''),
       t = this._table,
       w = this._w,
-      d = this._d, i;
-  for (i=0; i<d; ++i) {
-    t[i*w + l[i]] += 1;
+      d = this._d, i, r;
+  for (i=0, r=0; i<d; ++i, r+=w) {
+    t[r + l[i]] += 1;
   }
   this._num += 1;
 };
 
 // Query for approximate count.
-proto.query = function(value) {
+proto.query = function(v) {
   var min = +Infinity,
-      l = this.locations(value),
+      l = this.locations(v + ''),
       t = this._table,
       w = this._w,
-      d = this._d, i, r, v;
+      d = this._d, i, r, c;
   for (i=0, r=0; i<d; ++i, r+=w) {
-    v = t[r + l[i]];
-    if (v < min) min = v;
+    c = t[r + l[i]];
+    if (c < min) min = c;
   }
   return min;
 };
@@ -85,6 +106,15 @@ proto.dot = function(that) {
   } while (i < m);
 
   return min;
+};
+
+// Return a JSON-compatible serialized version of this sketch.
+proto.export = function() {
+  return {
+    num: this._num,
+    depth: this._d,
+    counts: [].slice.call(this._table)
+  };
 };
 
 module.exports = CountMin;

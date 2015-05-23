@@ -30,7 +30,7 @@ describe('count-mean-min sketch', function() {
     });
   });
 
-  it('should dot product', function() {
+  it('should estimate dot product', function() {
     var cm1 = new CountMeanMin(width, depth);
     var cm2 = new CountMeanMin(width, depth);
     var cm3 = new CountMeanMin(width, depth);
@@ -46,6 +46,14 @@ describe('count-mean-min sketch', function() {
     assert.closeTo(10, cm1.dot(cm1), 10*EPSILON);
     assert.closeTo(20, cm2.dot(cm2), 10*EPSILON);
     assert.closeTo(10, cm1.dot(cm2), 10*EPSILON);
+  });
+
+  it('should serialize and deserialize', function() {
+    var cm1 = new CountMeanMin(width, depth);
+    set1.forEach(function(d) { cm1.add(d); });
+    var json = JSON.stringify(cm1.export());
+    var cm2 = CountMeanMin.import(JSON.parse(json));
+    assert.deepEqual(cm1.export(), cm2.export());
   });
 
 });

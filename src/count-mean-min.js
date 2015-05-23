@@ -1,22 +1,35 @@
-var CountMin = require('./count-min');
-
-// Count-Mean-Min sketch extends Count-Min with improved estimation.
+// Count-Mean-Min sketches extend Count-Min with improved estimation.
 // See 'New Estimation Algorithms for Streaming Data: Count-min Can Do More'
 // by Deng & Rafiei, http://webdocs.cs.ualberta.ca/~fandeng/paper/cmm.pdf
-// Argument *w* specifies the width (number of row entries) of the sketch.
+
+var CountMin = require('./count-min');
+
+// Create a new Count-Mean-Min sketch.
+// If argument *w* is an array-like object, with a length property, then the
+// sketch is loaded with data from the array, each element is a 32-bit integer.
+// Otherwise, *w* specifies the width (number of row entries) of the sketch.
 // Argument *d* specifies the depth (number of hash functions) of the sketch.
-function CountMeanMin(w, d) {
-  CountMin.call(this, w, d);
+// Argument *num* indicates the number of elements add. This should only be
+// provided if *w* is an array, in which case *num* is required.
+function CountMeanMin(w, d, num) {
+  CountMin.call(this, w, d, num);
   this._q = Array(d);
 }
 
+// Create a new Count-Min sketch based on provided performance parameters.
+// Argument *n* is the expected count of all elements
+// Argument *e* is the acceptable absolute error.
+// Argument *p* is the probability of not achieving the error bound.
 CountMeanMin.create = CountMin.create;
+
+// Create a new Count-Mean-Min sketch from a serialized object.
+CountMeanMin.import = CountMin.import;
 
 var proto = (CountMeanMin.prototype = Object.create(CountMin.prototype));
 
 // Query for approximate count.
-proto.query = function(value) {
-  var l = this.locations(value),
+proto.query = function(v) {
+  var l = this.locations(v + ''),
       t = this._table,
       q = this._q,
       w = this._w,

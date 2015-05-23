@@ -1,7 +1,7 @@
 {
   "name": "datalib-sketch",
   "main": "datalib-sketch.js",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "homepage": "http://github.com/uwdata/datalib-sketch.git",
   "authors": [
     "UW Interactive Data Lab (http://idl.cs.washington.edu)"

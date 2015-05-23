@@ -1,6 +1,6 @@
 {
   "name": "datalib-sketch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Probabilistic data structures for large or streaming data sets.",
   "keywords": [
     "data",
@@ -21,7 +21,6 @@
   "license": "BSD-3-Clause",
   "devDependencies": {
     "browserify": "^9.0.8",
-    "browserify-shim": "^3.8.5",
     "chai": "^1.10.0",
     "gulp": "^3.8.11",
     "gulp-rename": "^1.2.2",

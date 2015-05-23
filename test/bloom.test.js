@@ -3,6 +3,8 @@
 var assert = require('chai').assert;
 var BloomFilter = require('../src/bloom');
 var EPSILON = 0.1;
+var width = 1021;
+var depth = 3;
 
 describe('bloom filter', function() {
   var set1 = 'abcdefghij'.split('');
@@ -16,7 +18,7 @@ describe('bloom filter', function() {
   }
 
   it('should approximately model set membership', function() {
-    var bf = new BloomFilter(1024, 3);
+    var bf = new BloomFilter(width, depth);
     set1.forEach(function(d) { bf.add(d); });
     assert.closeTo(10, bf.size(), 10*EPSILON);
     
@@ -30,9 +32,9 @@ describe('bloom filter', function() {
     assert.closeTo(0, miss, 10*EPSILON);
   });
 
-  it('should union', function() {
-    var bf1 = new BloomFilter(1024, 3);
-    var bf2 = new BloomFilter(1024, 3);
+  it('should support union', function() {
+    var bf1 = new BloomFilter(width, depth);
+    var bf2 = new BloomFilter(width, depth);
     set1.forEach(function(d) { bf1.add(d); });
     set2.forEach(function(d) { bf2.add(d); });
 
@@ -47,9 +49,9 @@ describe('bloom filter', function() {
     assert.closeTo(0, miss, 20*EPSILON);
   });
 
-  it('should jaccard', function() {
-    var bf1 = new BloomFilter(1024, 3);
-    var bf2 = new BloomFilter(1024, 3);
+  it('should estimate jaccard coefficient', function() {
+    var bf1 = new BloomFilter(width, depth);
+    var bf2 = new BloomFilter(width, depth);
     set1.forEach(function(d) { bf1.add(d); });
     set2.forEach(function(d) { bf2.add(d); });
 
@@ -62,4 +64,11 @@ describe('bloom filter', function() {
     assert.closeTo(0.5, bfu.jaccard(bf2), EPSILON);
   });
 
+  it('should serialize and deserialize', function() {
+    var bf1 = new BloomFilter(width, depth);
+    set1.forEach(function(d) { bf1.add(d); });
+    var json = JSON.stringify(bf1.export());
+    var bf2 = BloomFilter.import(JSON.parse(json));
+    assert.deepEqual(bf1.export(), bf2.export());
+  });
 });

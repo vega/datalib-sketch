@@ -1,12 +1,16 @@
-// Bloom Filter implementation. Heavily based on:
-// https://github.com/jasondavies/bloomfilter.js
+// Bloom Filters test whether an element is a member of a set.
+// False positive matches are possible, but false negatives are not.
+// See http://en.wikipedia.org/wiki/Bloom_filter
+
+// This code borrows heavily from http://github.com/jasondavies/bloomfilter.js
+
 var hash = require('./hash');
 
 var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined",
-    DEFAULT_BITS = 1024 * 64,
-    DEFAULT_HASH = 3;
+    DEFAULT_BITS = 1024 * 1024 * 8, // 1MB
+    DEFAULT_HASH = 5; // Optimal for 2% FPR over 1M elements
 
-// Creates a new bloom filter. If *w* is an array-like object, with a length
+// Create a new bloom filter. If *w* is an array-like object, with a length
 // property, then the bloom filter is loaded with data from the array, where
 // each element is a 32-bit integer. Otherwise, *w* should specify the width
 // of the filter in bits. Note that *w* is rounded up to the nearest multiple
@@ -34,13 +38,28 @@ function BloomFilter(w, d) {
   hash.init.call(this);
 }
 
+// Create a new bloom filter based on provided performance parameters.
+// Argument *n* is the expected set size (cardinality).
+// Argument *p* is the desired false positive rate.
+// http://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions
+BloomFilter.create = function(n, p) {
+  var w = -n * Math.log(p) / (Math.LN2 * Math.LN2),
+      d = (w / n) * Math.LN2;
+  return new BloomFilter(~~w, ~~d);
+};
+
+// Create a new bloom filter from a serialized object.
+BloomFilter.import = function(obj) {
+  return new BloomFilter(obj.bits, obj.depth);
+};
+
 var proto = BloomFilter.prototype;
 
 proto.locations = hash.locations;
 
 // Add a value to the filter.
 proto.add = function(v) {
-  var l = this.locations(v + ""),
+  var l = this.locations(v + ''),
       i = -1,
       d = this._d,
       buckets = this._buckets;
@@ -49,7 +68,7 @@ proto.add = function(v) {
 
 // Query for inclusion in the filter.
 proto.query = function(v) {
-  var l = this.locations(v + ""),
+  var l = this.locations(v + ''),
       i = -1,
       d = this._d,
       b,
@@ -111,11 +130,6 @@ proto.jaccard = function(bf) {
   y = Math.log(1 - y / this._w);
   z = Math.log(1 - z / this._w);
   return (x + y) / z - 1;
-};
-
-// Construct a new filter from a serialized object.
-proto.import = function(obj) {
-  return new BloomFilter(obj.bits, obj.depth);
 };
 
 // Return a JSON-compatible serialized version of this filter.

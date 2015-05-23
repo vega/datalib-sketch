@@ -11,10 +11,6 @@ describe('count-min sketch', function() {
   var set2 = 'klmnopqrst'.split('');
   var set3 = '0123456789'.split('');
 
-  function hitsum(cm) {
-    return function(sum, d) { return sum + cm.query(d); };
-  }
-
   it('should approximately model counts', function() {
     var cm = new CountMin(width, depth);
 
@@ -34,7 +30,7 @@ describe('count-min sketch', function() {
     });
   });
 
-  it('should dot product', function() {
+  it('should estimate dot product', function() {
     var cm1 = new CountMin(width, depth);
     var cm2 = new CountMin(width, depth);
     var cm3 = new CountMin(width, depth);
@@ -50,6 +46,14 @@ describe('count-min sketch', function() {
     assert.closeTo(10, cm1.dot(cm1), 10*EPSILON);
     assert.closeTo(20, cm2.dot(cm2), 10*EPSILON);
     assert.closeTo(10, cm1.dot(cm2), 10*EPSILON);
+  });
+
+  it('should serialize and deserialize', function() {
+    var cm1 = new CountMin(width, depth);
+    set1.forEach(function(d) { cm1.add(d); });
+    var json = JSON.stringify(cm1.export());
+    var cm2 = CountMin.import(JSON.parse(json));
+    assert.deepEqual(cm1.export(), cm2.export());
   });
 
 });
