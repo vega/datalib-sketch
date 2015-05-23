@@ -1,5 +1,5 @@
 module.exports = {
-  bloom:        require('./bloom'),
-  countmin:     require('./count-min'),
-  countmeanmin: require('./count-mean-min')
+  Bloom:        require('./bloom'),
+  CountMin:     require('./count-min'),
+  CountMeanMin: require('./count-mean-min')
 };
