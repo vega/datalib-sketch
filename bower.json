@@ -1,10 +1,9 @@
 {
   "name": "datalib-sketch",
   "main": "datalib-sketch.js",
-  "version": "0.0.3",
   "homepage": "http://github.com/uwdata/datalib-sketch.git",
   "authors": [
-    "UW Interactive Data Lab (http://idl.cs.washington.edu)"
+    "Jeffrey Heer (http://idl.cs.washington.edu)"
   ],
   "description": "Probabilistic data structures for large or streaming data sets.",
   "moduleType": [

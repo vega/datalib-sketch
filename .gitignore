@@ -5,5 +5,3 @@ node_modules
 temp
 datalib-sketch.js
 datalib-sketch.min.js
-datalib-sketch.min.js.map
-index.html

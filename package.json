@@ -1,6 +1,6 @@
 {
   "name": "datalib-sketch",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Probabilistic data structures for large or streaming data sets.",
   "keywords": [
     "data",
@@ -15,25 +15,26 @@
     "url": "http://github.com/uwdata/datalib-sketch.git"
   },
   "author": {
-    "name": "UW Interactive Data Lab",
+    "name": "Jeffrey Heer",
     "url": "http://idl.cs.washington.edu"
   },
   "license": "BSD-3-Clause",
   "devDependencies": {
-    "browserify": "^9.0.8",
-    "chai": "^1.10.0",
-    "gulp": "^3.8.11",
-    "gulp-rename": "^1.2.2",
-    "gulp-spawn-mocha": "^2.0.1",
-    "gulp-uglify": "^1.2.0",
-    "gulp-util": "^3.0.4",
-    "gulp-jshint": "^1.10.0",
-    "mocha": "^2.1.0",
-    "vinyl-buffer": "^1.0.0",
-    "vinyl-source-stream": "^1.1.0"
+    "browserify": "latest",
+    "browserify-shim": "latest",
+    "chai": "latest",
+    "istanbul": "latest",
+    "jshint": "latest",
+    "mocha": "latest",
+    "uglify-js": "latest"
   },
   "main": "src/index.js",
   "scripts": {
-    "test": "gulp test"
+    "deploy": "npm run lint && npm run test && scripts/deploy.sh",
+    "lint": "jshint src/",
+    "test": "mocha --recursive test/",
+    "cover": "istanbul cover _mocha -- --recursive test/",
+    "build": "browserify src/index.js --debug --standalone dl.sketch -o datalib-sketch.js",
+    "postbuild": "uglifyjs datalib-sketch.js -c -m -o datalib-sketch.min.js"
   }
 }
