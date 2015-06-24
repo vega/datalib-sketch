@@ -109,10 +109,8 @@ proto.union = function(bf) {
   return new BloomFilter(z, this._d);
 };
 
-// Jaccard co-efficient of two bloom filters.
-// The input filter must have the same size and hash count.
-// Otherwise, this method will throw an error.
-proto.jaccard = function(bf) {
+// Internal helper method for bloom filter comparison estimates.
+proto._estimate = function(bf, kernel) {
   if (bf._w !== this._w) throw 'Filter widths do not match.';
   if (bf._d !== this._d) throw 'Filter depths do not match.';
 
@@ -129,7 +127,25 @@ proto.jaccard = function(bf) {
   x = Math.log(1 - x / this._w);
   y = Math.log(1 - y / this._w);
   z = Math.log(1 - z / this._w);
-  return (x + y) / z - 1;
+  return kernel(x, y, z);
+};
+
+// Jaccard co-efficient of two bloom filters.
+// The input filter must have the same size and hash count.
+// Otherwise, this method will throw an error.
+proto.jaccard = function(bf) {
+  return this._estimate(bf, function(a, b, union) {
+    return (a + b) / union - 1;
+  });
+};
+
+// Set cover over the smaller of two bloom filters.
+// The input filter must have the same size and hash count.
+// Otherwise, this method will throw an error.
+proto.cover = function(bf) {
+  return this._estimate(bf, function(a, b, union) {
+    return (a + b - union) / Math.max(a, b);
+  });
 };
 
 // Return a JSON-compatible serialized version of this filter.

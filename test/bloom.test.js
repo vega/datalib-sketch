@@ -3,8 +3,8 @@
 var assert = require('chai').assert;
 var BloomFilter = require('../src/bloom');
 var EPSILON = 0.1;
-var width = 1021;
-var depth = 3;
+var width = 1024;
+var depth = 1;
 
 describe('bloom filter', function() {
   var set1 = 'abcdefghij'.split('');
@@ -62,6 +62,21 @@ describe('bloom filter', function() {
     var bfu = bf1.union(bf2);
     assert.closeTo(0.5, bfu.jaccard(bf1), EPSILON);
     assert.closeTo(0.5, bfu.jaccard(bf2), EPSILON);
+  });
+
+  it('should estimate set cover', function() {
+    var bf1 = new BloomFilter(width, depth);
+    var bf2 = new BloomFilter(width, depth);
+    set1.forEach(function(d) { bf1.add(d); });
+    set2.forEach(function(d) { bf2.add(d); });
+
+    assert.closeTo(0, bf1.cover(bf2), EPSILON);
+    assert.closeTo(1, bf1.cover(bf1), EPSILON);
+    assert.closeTo(1, bf2.cover(bf2), EPSILON);
+    
+    var bfu = bf1.union(bf2);
+    assert.closeTo(1.0, bfu.cover(bf1), EPSILON);
+    assert.closeTo(1.0, bfu.cover(bf2), EPSILON);
   });
 
   it('should serialize and deserialize', function() {
