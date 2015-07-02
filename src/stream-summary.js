@@ -1,9 +1,10 @@
-var DEFAULT_COUNTERS = 200;
+var DEFAULT_COUNTERS = 100;
 
 // Create a new stream summary sketch for tracking frequent values.
 // See: 'Efficient Computation of Frequent and Top-k Elements in Data Streams'
-// by A. Metwally, D. Agrawal & A. El Abbadi
-// Argument *w* specifies the number of active counters to maintain.
+// by A. Metwally, D. Agrawal & A. El Abbadi.
+// Argument *w* specifies the maximum number of active counters to maintain.
+// If not provided, *w* defaults to tracking a maximum of 100 values.
 function StreamSummary(w) {
   this._w = w || DEFAULT_COUNTERS;
   this._values = {};
@@ -35,6 +36,7 @@ StreamSummary.import = function(obj) {
   return ss;
 };
 
+// Generate a new frequency bucket.
 function bucket(count) {
   var b = {count: count};
   b.next = b;
@@ -45,6 +47,7 @@ function bucket(count) {
   return b;
 }
 
+// Generate a new counter node for a value.
 function entry(value, bucket) {
   return {
     bucket: bucket,
@@ -54,6 +57,7 @@ function entry(value, bucket) {
   };
 }
 
+// Insert *curr* ahead of linked list node *list*.
 function insert(list, curr) {
   var next = list.next;
   curr.next = next;
@@ -63,6 +67,7 @@ function insert(list, curr) {
   return curr;
 }
 
+// Detach *curr* from its linked list.
 function detach(curr) {
   var n = curr.next,
       p = curr.prev;
@@ -73,27 +78,32 @@ function detach(curr) {
 var proto = StreamSummary.prototype;
 
 // Add a value to the sketch.
+// Argument *v* is the value to add.
+// Argument *count* is the optional number of occurrences to register.
+// If *count* is not provided, an increment of 1 is assumed.
 proto.add = function(v, count) {
   count = count || 1;
-  var node = this._values[v];
+  var node = this._values[v], b;
+
   if (node == null) {
     if (this._size < this._w) {
-      var b = insert(this._buckets, bucket(0));
+      b = insert(this._buckets, bucket(0));
       node = insert(b.list, entry(v, b));
       this._size += 1;
     } else {
-      var min = this._buckets.next;
-      node = min.list.next;
+      b = this._buckets.next;
+      node = b.list.next;
       delete this._values[node.value];
       node.value = v;
-      node.error = min.count;
+      node.error = b.count;
     }
     this._values[v] = node;    
   }
-  this.increment(node, count);
+  this._increment(node, count);
 };
 
-proto.increment = function(node, count) {
+// Increment the count in the stream summary data structure.
+proto._increment = function(node, count) {
   var head = this._buckets,
       old  = node.bucket,
       prev = old,
@@ -141,7 +151,53 @@ proto.error = function(v) {
   return node ? node.error : -1;
 };
 
-// TODO add method to extract top-k
+// Returns the (approximate) top-k most frequent values,
+// returned in order of decreasing frequency.
+// All monitored values are returned if *k* is not provided
+// or is larger than the sketch size.
+proto.values = function(k) {
+  return this.collect(k, function(x) { return x.value; });
+};
+
+// Returns counts for the (approximate) top-k frequent values,
+// returned in order of decreasing frequency.
+// All monitored counts are returned if *k* is not provided
+// or is larger than the sketch size.
+proto.counts = function(k) {
+  return this.collect(k, function(x) { return x.count; });
+};
+
+// Returns estimation error values for the (approximate) top-k
+// frequent values, returned in order of decreasing frequency.
+// All monitored counts are returned if *k* is not provided
+// or is larger than the sketch size.
+proto.errors = function(k) {
+  return this.collect(k, function(x) { return x.error; });
+};
+
+// Collects values for each entry in the sketch, in order of
+// decreasing (approximate) frequency.
+// Argument *k* is the number of values to collect. If the *k* is not
+// provided or greater than the sketch size, all values are visited.
+// Argument *f* is an accessor function for collecting a value.
+proto.collect = function(k, f) {
+  if (k === 0) return [];
+  if (k == null || k < 0) k = this._size;
+
+  var data = Array(k),
+      head = this._buckets,
+      node, list, entry, i=0;
+
+  for (node = head.prev; node !== head; node = node.prev) {
+    list = node.list;
+    for (entry = list.prev; entry !== list; entry = entry.prev) {
+      data[i++] = f(entry);
+      if (i === k) return data;
+    }
+  }
+
+  return data;
+};
 
 // Return a JSON-compatible serialized version of this sketch.
 proto.export = function() {

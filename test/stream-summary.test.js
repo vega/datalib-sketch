@@ -53,10 +53,18 @@ describe('stream-summary', function() {
     assert.equal(ss.query(2), 3);
     assert.equal(ss.query(3), 0);
     assert.equal(ss.query(4), 2);
+
     assert.equal(ss.error(1), 0);
     assert.equal(ss.error(2), 0);
     assert.equal(ss.error(3),-1);
     assert.equal(ss.error(4), 1);
+
+    assert.deepEqual(ss.values(), [2, 1, 4]);
+    assert.deepEqual(ss.counts(), [3, 3, 2]);
+    assert.deepEqual(ss.errors(), [0, 0, 1]);
+    assert.deepEqual(ss.values(2), [2, 1]);
+    assert.deepEqual(ss.counts(2), [3, 3]);
+    assert.deepEqual(ss.errors(2), [0, 0]);
   });
 
   it('should serialize and deserialize', function() {
