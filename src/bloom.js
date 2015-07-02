@@ -135,7 +135,7 @@ proto._estimate = function(bf, kernel) {
 // Otherwise, this method will throw an error.
 proto.jaccard = function(bf) {
   return this._estimate(bf, function(a, b, union) {
-    return (a + b) / union - 1;
+    return union ? (a + b) / union - 1 : 0;
   });
 };
 
@@ -144,7 +144,8 @@ proto.jaccard = function(bf) {
 // Otherwise, this method will throw an error.
 proto.cover = function(bf) {
   return this._estimate(bf, function(a, b, union) {
-    return (a + b - union) / Math.max(a, b);
+    var denom = Math.max(a, b);
+    return denom ? (a + b - union) / denom : 0;
   });
 };
 

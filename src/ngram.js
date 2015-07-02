@@ -76,7 +76,7 @@ proto.dot = function(that) {
 proto.cosine = function(that) {
   var aa = this.norm(),
       bb = that.norm();
-  return this.dot(that) / (aa * bb);
+  return (aa && bb) ? this.dot(that) / (aa * bb) : 0;
 };
 
 // Return a JSON-compatible serialized version of this sketch.
