@@ -6,7 +6,7 @@
 
 var hash = require('./hash');
 
-var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined",
+var TYPED_ARRAYS = typeof ArrayBuffer !== 'undefined',
     DEFAULT_BITS = 1024 * 1024 * 8, // 1MB
     DEFAULT_HASH = 5; // Optimal for 2% FPR over 1M elements
 
