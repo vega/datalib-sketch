@@ -42,6 +42,21 @@ describe('t-digest', function() {
     NQ.forEach(function(q,i) { assert.closeTo(td.cdf(q), N[i], EPS); });
   });
 
+  it('should make monotonic estimates', function() {
+    var td, add = function(x) { td.add(x); };
+
+    // check estimates for normal distribution
+    td = new TDigest();
+    US.forEach(add);
+    var prevC = td.cdf(0),
+        prevQ = td.quantile(0),
+        currC, currQ;
+    for (var x=0.01; x<=1; x+=0.01, prevC = currC, prevQ = currQ) {
+      assert.isTrue((currC = td.cdf(x)) >= prevC);
+      assert.isTrue((currQ = td.quantile(x)) >= prevQ);
+    }
+  });
+
   it('should serialize and deserialize', function() {
     var td1 = new TDigest();
     NS.forEach(function(x) { td1.add(x); });

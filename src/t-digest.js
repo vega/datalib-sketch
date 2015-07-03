@@ -12,32 +12,35 @@ function TDigest(compress) {
   var cf = compress || DEFAULT_COMPRESS, tempsize, size;
   cf = cf < 20 ? 20 : cf > 1000 ? 1000: cf;
   // magic formula from regressing against known sizes for sample cf's
-  tempsize = ~~(7.5 + 0.37*cf - 2e-4 * cf * cf);
+  tempsize = ~~(7.5 + 0.37*cf - 2e-4*cf*cf);
   // should only need ceil(cf * PI / 2), double allocation for safety
-  size = ~~(Math.PI * cf + 0.5);
-  
-  this._cf = cf;
+  size = Math.ceil(Math.PI * cf);
 
-  this._totalWeight = 0;
+  this._cf = cf; // compression factor
+
+  this._totalSum = 0;
+  this._len = 0;
   this._weight = numArray(size);
   this._mean = numArray(size);
   this._min = Number.MAX_VALUE;
   this._max = -Number.MAX_VALUE;
 
-  this._unmergedWeight = 0;
+  this._unmergedSum = 0;
   this._mergeWeight = numArray(size);
   this._mergeMean = numArray(size);
 
-  this._tempUsed = 0;
+  this._tempLen = 0;
   this._tempWeight = numArray(tempsize);
   this._tempMean = numArray(tempsize);
   this._order = [];
-  
-  this._lastUsed = 0;
 }
 
 function numArray(size) {
   return TYPED_ARRAYS ? new Float64Array(size) : Array(size);
+}
+
+function integrate(cf, q) {
+  return cf * (Math.asin(2 * q - 1) + Math.PI / 2) / Math.PI;
 }
 
 function interpolate(x, x0, x1) {
@@ -49,7 +52,7 @@ TDigest.import = function(obj) {
   var td = new TDigest(obj.compress);
   td._min = obj.min;
   td._max = obj.max;
-  td._lastUsed = obj.mean.length;
+  td._len = obj.mean.length;
   for (var i=0, n=obj.mean.length; i<n; ++i) {
     td._mean[i] = obj.mean[i];
     td._weight[i] = obj.weight[i];
@@ -67,139 +70,110 @@ proto.add = function(v, count) {
   if (v == null || v !== v) return; // ignore null, NaN
   count = count || 1;
   
-  if (this._tempUsed >= this._tempWeight.length) {
+  if (this._tempLen >= this._tempWeight.length) {
     this._mergeValues();
   }
 
-  var where = this._tempUsed++;
-  this._tempWeight[where] = count;
-  this._tempMean[where] = v;
-  this._unmergedWeight += count;
+  var n = this._tempLen++;
+  this._tempWeight[n] = count;
+  this._tempMean[n] = v;
+  this._unmergedSum += count;
 };
 
 proto._mergeValues = function() {
-  if (this._unmergedWeight === 0) return;
-  // var m = [], w = [];
-  // for (var mm=0; mm<this._tempUsed; ++mm) {
-  //   m.push(this._tempMean[mm]);
-  //   w.push(this._tempWeight[mm]);
-  // }
-  // console.log('MERGE', this._tempUsed, m, w);
+  if (this._unmergedSum === 0) return;
 
-  var tempWeight = this._tempWeight,
-      tempMean = this._tempMean,
-      tempUsed = this._tempUsed,
-      weight = this._weight,
-      mean = this._mean,
+  var tw = this._tempWeight,
+      tu = this._tempMean,
+      tn = this._tempLen,
+      w = this._weight,
+      u = this._mean,
+      n = 0,
       order = this._order,
-      wSoFar = 0, n = 0, i, j, k1, ix;
+      sum = 0, ii, i, j, k1;
 
   // get sort order for temp values
-  // TODO make more efficient?
-  order.length = tempUsed;
-  for (i=0; i<tempUsed; ++i) {
-    order[i] = i;
-  }
-  order.sort(function(a,b) {
-    return tempMean[a] - tempMean[b];
-  });
+  order.length = tn;
+  for (i=0; i<tn; ++i) order[i] = i;
+  order.sort(function(a,b) { return tu[a] - tu[b]; });
 
-  if (this._totalWeight > 0) {
-    if (weight[this._lastUsed] > 0) {
-      n = this._lastUsed + 1;
+  if (this._totalSum > 0) {
+    if (w[this._len] > 0) {
+      n = this._len + 1;
     } else {
-      n = this._lastUsed;
+      n = this._len;
     }
   }
-  this._lastUsed = 0;
-  this._totalWeight += this._unmergedWeight;
-  this._unmergedWeight = 0;
+  this._len = 0;
+  this._totalSum += this._unmergedSum;
+  this._unmergedSum = 0;
 
   // merge tempWeight,tempMean and weight,mean into mergeWeight,mergeMean
-  for (i=j=k1=0; i < tempUsed && j < n;) {
-    ix = order[i];
-    if (tempMean[ix] <= mean[j]) {
-      wSoFar += tempWeight[ix];
-      k1 = this._mergeCentroid(wSoFar, k1, tempWeight[ix], tempMean[ix]);
+  for (i=j=k1=0; i < tn && j < n;) {
+    ii = order[i];
+    if (tu[ii] <= u[j]) {
+      sum += tw[ii];
+      k1 = this._mergeCentroid(sum, k1, tw[ii], tu[ii]);
       i++;
     } else {
-      wSoFar += weight[j];
-      k1 = this._mergeCentroid(wSoFar, k1, weight[j], mean[j]);
+      sum += w[j];
+      k1 = this._mergeCentroid(sum, k1, w[j], u[j]);
       j++;
     }
   }
-
-  while (i < tempUsed) {
-    ix = order[i];
-    wSoFar += tempWeight[ix];
-    k1 = this._mergeCentroid(wSoFar, k1, tempWeight[ix], tempMean[ix]);
-    i++;
+  for (; i < tn; ++i) {
+    ii = order[i];
+    sum += tw[ii];
+    k1 = this._mergeCentroid(sum, k1, tw[ii], tu[ii]);
   }
-
-  while (j < n) {
-    wSoFar += weight[j];
-    k1 = this._mergeCentroid(wSoFar, k1, weight[j], mean[j]);
-    j++;
+  for (; j < n; ++j) {
+    sum += w[j];
+    k1 = this._mergeCentroid(sum, k1, w[j], u[j]);
   }
-  this._tempUsed = 0;
-
-  // var m = [], w = [];
-  // for (var mm=0; mm<=this._lastUsed; ++mm) {
-  //   m.push(this._mergeMean[mm]);
-  //   w.push(this._mergeWeight[mm]);
-  // }
-  // console.log('MERGE', this._lastUsed, m, w);
-
+  this._tempLen = 0;
 
   // swap pointers for working space and merge space
   this._weight = this._mergeWeight;
-  this._mergeWeight = weight;
-  for (i=0, n=weight.length; i<n; ++i) {
-    weight[i] = 0;
-  }
+  this._mergeWeight = w;
+  for (i=0, n=w.length; i<n; ++i) w[i] = 0;
 
   this._mean = this._mergeMean;
-  this._mergeMean = mean;
+  this._mergeMean = u;
 
-  if (this._totalWeight > 0) {
+  if (this._totalSum > 0) {
     this._min = Math.min(this._min, this._mean[0]);
-    if (this._weight[this._lastUsed] > 0) {
-      this._max = Math.max(this._max, this._mean[this._lastUsed]);
+    if (this._weight[this._len] > 0) {
+      this._max = Math.max(this._max, this._mean[this._len]);
     } else {
-      this._max = Math.max(this._max, this._mean[this._lastUsed - 1]);
+      this._max = Math.max(this._max, this._mean[this._len - 1]);
     }
   }
 };
 
-proto._mergeCentroid = function(wSoFar, k1, w, m) {
-  var mergeWeight = this._mergeWeight,
-      mergeMean = this._mergeMean,
-      lastUsed = this._lastUsed;
+proto._mergeCentroid = function(sum, k1, wt, ut) {
+  var w = this._mergeWeight,
+      u = this._mergeMean,
+      n = this._len,
+      k2 = integrate(this._cf, sum / this._totalSum);
 
-  var k2 = this._integrate(wSoFar / this._totalWeight);
-  if (k2 - k1 <= 1 || mergeWeight[this._lastUsed] === 0) {
+  if (k2 - k1 <= 1 || w[n] === 0) {
     // merge into existing centroid
-    mergeWeight[lastUsed] += w;
-    mergeMean[lastUsed] = mergeMean[lastUsed] +
-      (m - mergeMean[lastUsed]) * w / mergeWeight[lastUsed];
+    w[n] += wt;
+    u[n] = u[n] + (ut - u[n]) * wt / w[n];
   } else {
     // create new centroid
-    this._lastUsed = ++lastUsed;
-    mergeMean[lastUsed] = m;
-    mergeWeight[lastUsed] = w;
-    k1 = this._integrate((wSoFar - w) / this._totalWeight);
+    this._len = ++n;
+    u[n] = ut;
+    w[n] = wt;
+    k1 = integrate(this._cf, (sum - wt) / this._totalSum);
   }
 
   return k1;
 };
 
-proto._integrate = function(q) {
-  return this._cf * (Math.asin(2 * q - 1) + Math.PI / 2) / Math.PI;
-};
-
 // The number of values that have been added to this sketch.
 proto.size = function() {
-  return this._totalWeight + this._unmergedWeight;
+  return this._totalSum + this._unmergedSum;
 };
 
 // Query for estimated quantile *q*.
@@ -207,41 +181,42 @@ proto.size = function() {
 // For example, q = 0.5 queries for the median.
 proto.quantile = function(q) {
   this._mergeValues();
-  var weight = this._weight,
-      mean = this._mean,
-      n = this._lastUsed;
+  q = q * this._totalSum;
 
-  if (n === 0) return weight[n] === 0 ? NaN : mean[0];
-  if (weight[n] > 0) ++n;
+  var w = this._weight,
+      u = this._mean,
+      n = this._len,
+      max = this._max,
+      ua = u[0], ub, // means
+      wa = w[0], wb, // weights
+      left = this._min, right,
+      sum = 0, p, i;
 
-  var index = q * this._totalWeight,
-      weightSoFar = 0,
-      left = this._min,
-      a = mean[0],
-      aCount = weight[0],
-      right, b, bCount, p, i;
+  if (n === 0) return w[n] === 0 ? NaN : u[0];
+  if (w[n] > 0) ++n;
 
   for (i=1; i<n; ++i) {
-    b = mean[i];
-    bCount = weight[i];
-    right = (bCount * a + aCount * b) / (aCount + bCount);
-    if (index < weightSoFar + aCount) {
-      p = (index - weightSoFar) / aCount;
-      return left * (1 - p) + right * p;
+    ub = u[i];
+    wb = w[i];
+    right = (wb * ua + wa * ub) / (wa + wb);
+
+    if (q < sum + wa) {
+      p = (q - sum) / wa;
+      return left * (1-p) + right * p;
     }
 
-    weightSoFar += aCount;
-    a = b;
-    aCount = bCount;
+    sum += wa;
+    ua = ub;
+    wa = wb;
     left = right;
   }
 
-  right = this._max;
-  if (index < weightSoFar + aCount) {
-    p = (index - weightSoFar) / aCount;
-    return left * (1 - p) + right * p;
+  right = max;
+  if (q < sum + wa) {
+    p = (q - sum) / wa;
+    return left * (1-p) + right * p;
   } else {
-    return this._max;
+    return max;
   }
 };
 
@@ -249,78 +224,58 @@ proto.quantile = function(q) {
 proto.cdf = function(v) {
   this._mergeValues();
 
-  var weight = this._weight,
-      mean = this._mean,
-      n = this._lastUsed,
+  var total = this._totalSum,
+      w = this._weight,
+      u = this._mean,
+      n = this._len,
       min = this._min,
-      max = this._max;
+      max = this._max,
+      ua = min, ub, // means
+      wa = 0,   wb, // weights
+      sum = 0, left = 0, right, i;
 
   if (v < min) return 0;
   if (v > max) return 1;
   if (n === 0) {
-    return weight[n] === 0 ? NaN :
+    return w[n] === 0 ? NaN :
       (max - min < EPSILON) ? 0.5 :
       interpolate(v, min, max);
   }
-
-  if (weight[n] > 0) ++n;
-
-  var total = this._totalWeight,
-      r = 0,
-      a = min,
-      b = min,
-      aCount = 0,
-      bCount = 0,
-      left = 0,
-      right = 0, i;
+  if (w[n] > 0) ++n;
 
   // find enclosing pair of centroids (treat min as a virtual centroid)
   for (i=0; i<n; ++i) {
-    left = b - (a + right);
-    a = b;
-    aCount = bCount;
-
-    b = mean[i];
-    bCount = weight[i];
-    right = (b - a) * aCount / (aCount + bCount);
+    ub = u[i];
+    wb = w[i];
+    right = (ub - ua) * wa / (wa + wb);
 
     // we know that x >= a-left
-    if (v < a + right) {
-      v = (r + aCount * interpolate(v, a-left, a+right)) / total;
+    if (v < ua + right) {
+      v = (sum + wa * interpolate(v, ua-left, ua+right)) / total;
       return v > 0 ? v : 0;
     }
 
-    r += aCount;
+    left = ub - (ua + right);
+    ua = ub;
+    wa = wb;
+    sum += wa;
   }
 
-  left = b - (a + right);
-  a = b;
-  aCount = bCount;
-  right = max - a;
-
   // for the last element, use max to determine right
-  return  (v < a + right) ?
-    (r + aCount * interpolate(v, a-left, a+right)) / total :
+  right = max - ua;
+  return  (v < ua + right) ?
+    (sum + wa * interpolate(v, ua-left, ua+right)) / total :
     1;
 };
 
 // Return a JSON-compatible serialized version of this sketch.
 proto.export = function() {
-  var n = this._lastUsed, i,
-      m = Array(n),
-      w = Array(n);
-
-  for (i=0; i<n; ++i) {
-    m[i] = this._mean[i];
-    w[i] = this._weight[i];
-  }
-  
   return {
     compress: this._cf,
-    min: this._min,
-    max: this._max,
-    mean: m,
-    weight: w
+    min:      this._min,
+    max:      this._max,
+    mean:     [].slice.call(this._mean, 0, this._len),
+    weight:   [].slice.call(this._weight, 0, this._len)
   };
 };
 
