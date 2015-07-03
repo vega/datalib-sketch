@@ -1,7 +1,7 @@
 {
   "name": "datalib-sketch",
   "version": "0.0.7",
-  "description": "Approximate data structures for large or streaming data sets.",
+  "description": "Probabilistic data structures for large or streaming data sets.",
   "keywords": [
     "data",
     "sketch",
