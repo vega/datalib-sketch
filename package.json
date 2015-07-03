@@ -1,16 +1,18 @@
 {
   "name": "datalib-sketch",
-  "version": "0.0.6",
-  "description": "Probabilistic data structures for large or streaming data sets.",
+  "version": "0.0.7",
+  "description": "Approximate data structures for large or streaming data sets.",
   "keywords": [
     "data",
     "sketch",
     "approximate",
     "streaming",
+    "bloom filter",
     "count min",
     "count mean min",
-    "bloom filter",
-    "ngram"
+    "ngram",
+    "stream summary",
+    "t-digest"
   ],
   "repository": {
     "type": "git",
@@ -28,7 +30,8 @@
     "istanbul": "latest",
     "jshint": "latest",
     "mocha": "latest",
-    "uglify-js": "latest"
+    "uglify-js": "latest",
+    "datalib": "1.3.x"
   },
   "main": "src/index.js",
   "scripts": {

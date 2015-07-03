@@ -3,5 +3,6 @@ module.exports = {
   CountMin:      require('./count-min'),
   CountMeanMin:  require('./count-mean-min'),
   NGram:         require('./ngram'),
-  StreamSummary: require('./stream-summary')
+  StreamSummary: require('./stream-summary'),
+  TDigest:       require('./t-digest')
 };

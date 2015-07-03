@@ -3,5 +3,6 @@ node_modules
 .DS_Store
 .idea
 temp
+coverage
 datalib-sketch.js
 datalib-sketch.min.js

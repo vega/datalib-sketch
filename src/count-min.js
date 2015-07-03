@@ -1,6 +1,6 @@
 var hash = require('./hash');
 
-var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined",
+var TYPED_ARRAYS = typeof ArrayBuffer !== 'undefined',
     DEFAULT_BINS = 27191,
     DEFAULT_HASH = 9;
 
