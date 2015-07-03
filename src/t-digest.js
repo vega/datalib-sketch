@@ -19,7 +19,7 @@ function TDigest(compress) {
   this._cf = cf; // compression factor
 
   this._totalSum = 0;
-  this._len = 0;
+  this._last = 0;
   this._weight = numArray(size);
   this._mean = numArray(size);
   this._min = Number.MAX_VALUE;
@@ -29,7 +29,7 @@ function TDigest(compress) {
   this._mergeWeight = numArray(size);
   this._mergeMean = numArray(size);
 
-  this._tempLen = 0;
+  this._tempLast = 0;
   this._tempWeight = numArray(tempsize);
   this._tempMean = numArray(tempsize);
   this._order = [];
@@ -50,13 +50,15 @@ function interpolate(x, x0, x1) {
 // Create a new t-digest sketch from a serialized object.
 TDigest.import = function(obj) {
   var td = new TDigest(obj.compress);
+  var sum = 0;
   td._min = obj.min;
   td._max = obj.max;
-  td._len = obj.mean.length;
+  td._last = obj.mean.length - 1;
   for (var i=0, n=obj.mean.length; i<n; ++i) {
     td._mean[i] = obj.mean[i];
-    td._weight[i] = obj.weight[i];
+    sum += (td._weight[i] = obj.weight[i]);
   }
+  td._totalSum = sum;
   return td;
 };
 
@@ -70,11 +72,11 @@ proto.add = function(v, count) {
   if (v == null || v !== v) return; // ignore null, NaN
   count = count || 1;
   
-  if (this._tempLen >= this._tempWeight.length) {
+  if (this._tempLast >= this._tempWeight.length) {
     this._mergeValues();
   }
 
-  var n = this._tempLen++;
+  var n = this._tempLast++;
   this._tempWeight[n] = count;
   this._tempMean[n] = v;
   this._unmergedSum += count;
@@ -85,7 +87,7 @@ proto._mergeValues = function() {
 
   var tw = this._tempWeight,
       tu = this._tempMean,
-      tn = this._tempLen,
+      tn = this._tempLast,
       w = this._weight,
       u = this._mean,
       n = 0,
@@ -98,13 +100,13 @@ proto._mergeValues = function() {
   order.sort(function(a,b) { return tu[a] - tu[b]; });
 
   if (this._totalSum > 0) {
-    if (w[this._len] > 0) {
-      n = this._len + 1;
+    if (w[this._last] > 0) {
+      n = this._last + 1;
     } else {
-      n = this._len;
+      n = this._last;
     }
   }
-  this._len = 0;
+  this._last = 0;
   this._totalSum += this._unmergedSum;
   this._unmergedSum = 0;
 
@@ -130,7 +132,7 @@ proto._mergeValues = function() {
     sum += w[j];
     k1 = this._mergeCentroid(sum, k1, w[j], u[j]);
   }
-  this._tempLen = 0;
+  this._tempLast = 0;
 
   // swap pointers for working space and merge space
   this._weight = this._mergeWeight;
@@ -140,20 +142,15 @@ proto._mergeValues = function() {
   this._mean = this._mergeMean;
   this._mergeMean = u;
 
-  if (this._totalSum > 0) {
-    this._min = Math.min(this._min, this._mean[0]);
-    if (this._weight[this._len] > 0) {
-      this._max = Math.max(this._max, this._mean[this._len]);
-    } else {
-      this._max = Math.max(this._max, this._mean[this._len - 1]);
-    }
-  }
+  if (this._weight[n = this._last] <= 0) --n;
+  this._min = Math.min(this._min, this._mean[0]);
+  this._max = Math.max(this._max, this._mean[n]);
 };
 
 proto._mergeCentroid = function(sum, k1, wt, ut) {
   var w = this._mergeWeight,
       u = this._mergeMean,
-      n = this._len,
+      n = this._last,
       k2 = integrate(this._cf, sum / this._totalSum);
 
   if (k2 - k1 <= 1 || w[n] === 0) {
@@ -162,7 +159,7 @@ proto._mergeCentroid = function(sum, k1, wt, ut) {
     u[n] = u[n] + (ut - u[n]) * wt / w[n];
   } else {
     // create new centroid
-    this._len = ++n;
+    this._last = ++n;
     u[n] = ut;
     w[n] = wt;
     k1 = integrate(this._cf, (sum - wt) / this._totalSum);
@@ -185,7 +182,7 @@ proto.quantile = function(q) {
 
   var w = this._weight,
       u = this._mean,
-      n = this._len,
+      n = this._last,
       max = this._max,
       ua = u[0], ub, // means
       wa = w[0], wb, // weights
@@ -227,17 +224,17 @@ proto.cdf = function(v) {
   var total = this._totalSum,
       w = this._weight,
       u = this._mean,
-      n = this._len,
+      n = this._last,
       min = this._min,
       max = this._max,
       ua = min, ub, // means
       wa = 0,   wb, // weights
       sum = 0, left = 0, right, i;
 
-  if (v < min) return 0;
-  if (v > max) return 1;
   if (n === 0) {
     return w[n] === 0 ? NaN :
+      v < min ? 0 :
+      v > max ? 1 :
       (max - min < EPSILON) ? 0.5 :
       interpolate(v, min, max);
   }
@@ -249,16 +246,16 @@ proto.cdf = function(v) {
     wb = w[i];
     right = (ub - ua) * wa / (wa + wb);
 
-    // we know that x >= a-left
+    // we know that v >= ua-left
     if (v < ua + right) {
       v = (sum + wa * interpolate(v, ua-left, ua+right)) / total;
       return v > 0 ? v : 0;
     }
 
+    sum += wa;
     left = ub - (ua + right);
     ua = ub;
     wa = wb;
-    sum += wa;
   }
 
   // for the last element, use max to determine right
@@ -268,14 +265,25 @@ proto.cdf = function(v) {
     1;
 };
 
+// Union this t-digest with another.
+proto.union = function(td) {
+  var u = TDigest.import(this.export());
+  td._mergeValues();
+  for (var i=0, n=td._last; i<n; ++i) {
+    u.add(td._mean[i], td._weight[i]);
+  }
+  return u;
+};
+
 // Return a JSON-compatible serialized version of this sketch.
 proto.export = function() {
+  this._mergeValues();
   return {
     compress: this._cf,
     min:      this._min,
     max:      this._max,
-    mean:     [].slice.call(this._mean, 0, this._len),
-    weight:   [].slice.call(this._weight, 0, this._len)
+    mean:     [].slice.call(this._mean, 0, this._last+1),
+    weight:   [].slice.call(this._weight, 0, this._last+1)
   };
 };
 
