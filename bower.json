@@ -1,7 +1,7 @@
 {
   "name": "datalib-sketch",
   "main": "datalib-sketch.js",
-  "homepage": "http://github.com/uwdata/datalib-sketch.git",
+  "homepage": "http://github.com/vega/datalib-sketch.git",
   "authors": [
     "Jeffrey Heer (http://idl.cs.washington.edu)"
   ],

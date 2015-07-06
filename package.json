@@ -16,7 +16,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "http://github.com/uwdata/datalib-sketch.git"
+    "url": "http://github.com/vega/datalib-sketch.git"
   },
   "author": {
     "name": "Jeffrey Heer",
