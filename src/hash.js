@@ -1,4 +1,4 @@
-var TYPED_ARRAYS = typeof ArrayBuffer !== "undefined";
+var arrays = require('./arrays');
 
 // Fowler/Noll/Vo hashing.
 function fnv_1a(v) {
@@ -46,19 +46,7 @@ function fnv_1a_b(a) {
 
 // mix-in method for multi-hash initialization
 module.exports.init = function() {
-  var d = this._d,
-      w = this._w;
-
-  if (TYPED_ARRAYS) {
-    var kbytes = 1 << Math.ceil(Math.log(
-          Math.ceil(Math.log(w) / Math.LN2 / 8)
-        ) / Math.LN2),
-        array = kbytes === 1 ? Uint8Array : kbytes === 2 ? Uint16Array : Uint32Array,
-        kbuffer = new ArrayBuffer(kbytes * d);
-    this._locations = new array(kbuffer);
-  } else {
-    this._locations = [];
-  }
+  this._locations = arrays.ints(this._d);
 };
 
 // mix-in method for multi-hash calculation

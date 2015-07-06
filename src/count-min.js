@@ -1,7 +1,7 @@
-var hash = require('./hash');
+var arrays = require('./arrays'),
+    hash = require('./hash');
 
-var TYPED_ARRAYS = typeof ArrayBuffer !== 'undefined',
-    DEFAULT_BINS = 27191,
+var DEFAULT_BINS = 27191,
     DEFAULT_HASH = 9;
 
 // Create a new Count-Min sketch for approximate counts of value frequencies.
@@ -23,15 +23,9 @@ function CountMin(w, d, num) {
   this._d = d;
   this._num = num || 0;
   n = w * d;
+  t = this._table = arrays.ints(n);
+  if (a) while (++i < n) t[i] = a[i];
 
-  if (TYPED_ARRAYS) {
-    t = this._table = new Int32Array(n);
-    if (a) while (++i < n) t[i] = a[i];
-  } else {
-    t = this._table = Array(n);
-    if (a) while (++i < n) t[i] = a[i];
-    while (++i < n) t[i] = 0;
-  }
   hash.init.call(this);
 }
 

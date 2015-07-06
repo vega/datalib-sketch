@@ -1,55 +1,61 @@
-var TYPED_ARRAYS = typeof ArrayBuffer !== 'undefined',
-    EPSILON = 1e-300,
-    DEFAULT_COMPRESS = 100;
-
-// Create a new t-digest sketch for quantile and histogram estimation.
+// T-Digests are a sketch for quantile and cdf estimation.
+// Similar in spirit to a 1D k-means, the t-digest fits a bounded set of
+// centroids to streaming input to learn a variable-width histogram.
 // See: 'Computing Extremely Accurate Quantiles using t-Digests'
 // by T. Dunning & O. Ertl.
 // Based on the Ted Dunning's merging digest implementation at:
 // https://github.com/tdunning/t-digest
-// Argument *compress* is the compression factor, defaults to 100, max 1000.
-function TDigest(compress) {
-  var cf = compress || DEFAULT_COMPRESS, tempsize, size;
-  cf = cf < 20 ? 20 : cf > 1000 ? 1000: cf;
-  // magic formula from regressing against known sizes for sample cf's
-  tempsize = ~~(7.5 + 0.37*cf - 2e-4*cf*cf);
-  // should only need ceil(cf * PI / 2), double allocation for safety
-  size = Math.ceil(Math.PI * cf);
+// One major departure from the reference implementation is the use of
+// a binary search to speed up quantile and cdf queries.
 
-  this._cf = cf; // compression factor
+var arrays = require('./arrays');
 
+var EPSILON = 1e-300,
+    DEFAULT_CENTROIDS = 100;
+
+// Create a new t-digest sketch for quantile and histogram estimation.
+// Argument *n* is the approximate number of centroids, defaults to 100.
+function TDigest(n) {
+  this._nc = n || DEFAULT_CENTROIDS;
+  var size = Math.ceil(this._nc * Math.PI/2);
+  
   this._totalSum = 0;
   this._last = 0;
-  this._weight = numArray(size);
-  this._mean = numArray(size);
+  this._weight = arrays.floats(size);
+  this._mean = arrays.floats(size);
   this._min = Number.MAX_VALUE;
   this._max = -Number.MAX_VALUE;
 
+  // double buffer to simplify merge operations
+  // _mergeWeight also used for transient storage of cumulative weights
+  this._mergeWeight = arrays.floats(size);
+  this._mergeMean = arrays.floats(size);
+
+  // temporary buffers for recently added values
+  var tempsize = numTemp(this._nc);
   this._unmergedSum = 0;
-  this._mergeWeight = numArray(size);
-  this._mergeMean = numArray(size);
-
   this._tempLast = 0;
-  this._tempWeight = numArray(tempsize);
-  this._tempMean = numArray(tempsize);
-  this._order = [];
+  this._tempWeight = arrays.floats(tempsize);
+  this._tempMean = arrays.floats(tempsize);
+  this._order = []; // for sorting
 }
 
-function numArray(size) {
-  return TYPED_ARRAYS ? new Float64Array(size) : Array(size);
-}
-
-function integrate(cf, q) {
-  return cf * (Math.asin(2 * q - 1) + Math.PI / 2) / Math.PI;
-}
-
-function interpolate(x, x0, x1) {
-  return (x - x0) / (x1 - x0);
+// Given the number of centroids, determine temp buffer size
+// Perform binary search to find value k such that N = k log2 k
+// This should give us good amortized asymptotic complexity
+function numTemp(N) {
+  var lo = 1, hi = N, mid;
+  while (lo < hi) {
+    mid = lo + hi >>> 1;
+    if (N > mid * Math.log(mid) / Math.LN2) { lo = mid + 1; }
+    else { hi = mid; }
+  }
+  return lo;
 }
 
 // Create a new t-digest sketch from a serialized object.
 TDigest.import = function(obj) {
-  var td = new TDigest(obj.compress);
+  var td = new TDigest(obj.centroids);
   var sum = 0;
   td._min = obj.min;
   td._max = obj.max;
@@ -64,13 +70,16 @@ TDigest.import = function(obj) {
 
 var proto = TDigest.prototype;
 
+// -- Construction Methods -----
+
 // Add a value to the t-digest.
 // Argument *v* is the value to add.
 // Argument *count* is the integer number of occurrences to add.
 // If not provided, *count* defaults to 1.
 proto.add = function(v, count) {
   if (v == null || v !== v) return; // ignore null, NaN
-  count = count || 1;
+  count = count == null ? 1 : count;
+  if (count <= 0) throw new Error('Count must be greater than zero.');
   
   if (this._tempLast >= this._tempWeight.length) {
     this._mergeValues();
@@ -94,23 +103,17 @@ proto._mergeValues = function() {
       order = this._order,
       sum = 0, ii, i, j, k1;
 
-  // get sort order for temp values
+  // get sort order for added values in temp buffers
   order.length = tn;
   for (i=0; i<tn; ++i) order[i] = i;
   order.sort(function(a,b) { return tu[a] - tu[b]; });
 
-  if (this._totalSum > 0) {
-    if (w[this._last] > 0) {
-      n = this._last + 1;
-    } else {
-      n = this._last;
-    }
-  }
+  if (this._totalSum > 0) n = this._last + 1;
   this._last = 0;
   this._totalSum += this._unmergedSum;
   this._unmergedSum = 0;
 
-  // merge tempWeight,tempMean and weight,mean into mergeWeight,mergeMean
+  // merge existing centroids with added values in temp buffers
   for (i=j=k1=0; i < tn && j < n;) {
     ii = order[i];
     if (tu[ii] <= u[j]) {
@@ -123,11 +126,13 @@ proto._mergeValues = function() {
       j++;
     }
   }
+  // only temp buffer values remain
   for (; i < tn; ++i) {
     ii = order[i];
     sum += tw[ii];
     k1 = this._mergeCentroid(sum, k1, tw[ii], tu[ii]);
   }
+  // only existing centroids remain
   for (; j < n; ++j) {
     sum += w[j];
     k1 = this._mergeCentroid(sum, k1, w[j], u[j]);
@@ -137,12 +142,14 @@ proto._mergeValues = function() {
   // swap pointers for working space and merge space
   this._weight = this._mergeWeight;
   this._mergeWeight = w;
-  for (i=0, n=w.length; i<n; ++i) w[i] = 0;
-
   this._mean = this._mergeMean;
   this._mergeMean = u;
 
-  if (this._weight[n = this._last] <= 0) --n;
+  u[0] = this._weight[0];
+  for (i=1, n=this._last, w[0]=0; i<=n; ++i) {
+    w[i] = 0; // zero out merge weights
+    u[i] = u[i-1] + this._weight[i]; // stash cumulative dist
+  }
   this._min = Math.min(this._min, this._mean[0]);
   this._max = Math.max(this._max, this._mean[n]);
 };
@@ -151,22 +158,46 @@ proto._mergeCentroid = function(sum, k1, wt, ut) {
   var w = this._mergeWeight,
       u = this._mergeMean,
       n = this._last,
-      k2 = integrate(this._cf, sum / this._totalSum);
+      k2 = integrate(this._nc, sum / this._totalSum);
 
   if (k2 - k1 <= 1 || w[n] === 0) {
-    // merge into existing centroid
+    // merge into existing centroid if centroid index difference (k2-k1)
+    // is within 1 or if current centroid is empty
     w[n] += wt;
-    u[n] = u[n] + (ut - u[n]) * wt / w[n];
+    u[n] += (ut - u[n]) * wt / w[n];
   } else {
-    // create new centroid
+    // otherwise create a new centroid
     this._last = ++n;
     u[n] = ut;
     w[n] = wt;
-    k1 = integrate(this._cf, (sum - wt) / this._totalSum);
+    k1 = integrate(this._nc, (sum - wt) / this._totalSum);
   }
 
   return k1;
 };
+
+// Converts a quantile into a centroid index value. The centroid index is
+// nominally the number k of the centroid that a quantile point q should
+// belong to. Due to round-offs, however, we can't align things perfectly
+// without splitting points and centroids. We don't want to do that, so we
+// have to allow for offsets.
+// In the end, the criterion is that any quantile range that spans a centroid
+// index range more than one should be split across more than one centroid if
+// possible. This won't be possible if the quantile range refers to a single
+// point or an already existing centroid.
+// We use the arcsin function to map from the quantile domain to the centroid
+// index range. This produces a mapping that is steep near q=0 or q=1 so each
+// centroid there will correspond to less q range. Near q=0.5, the mapping is
+// flatter so that centroids there will represent a larger chunk of quantiles.
+function integrate(nc, q) {
+  // First, scale and bias the quantile domain to [-1, 1]
+  // Next, bias and scale the arcsin range to [0, 1]
+  // This gives us a [0,1] interpolant following the arcsin shape
+  // Finally, multiply by centroid count for centroid scale value
+  return nc * (Math.asin(2 * q - 1) + Math.PI/2) / Math.PI;
+}
+
+// -- Query Methods -----
 
 // The number of values that have been added to this sketch.
 proto.size = function() {
@@ -178,92 +209,76 @@ proto.size = function() {
 // For example, q = 0.5 queries for the median.
 proto.quantile = function(q) {
   this._mergeValues();
-  q = q * this._totalSum;
 
-  var w = this._weight,
-      u = this._mean,
+  var total = this._totalSum,
       n = this._last,
-      max = this._max,
-      ua = u[0], ub, // means
-      wa = w[0], wb, // weights
-      left = this._min, right,
-      sum = 0, p, i;
+      u = this._mean,
+      w = this._weight,
+      c = this._mergeMean,
+      i, l, r, min, max;
 
-  if (n === 0) return w[n] === 0 ? NaN : u[0];
-  if (w[n] > 0) ++n;
+  l = min = this._min;
+  r = max = this._max;
+  if (total === 0) return NaN;
+  if (q <= 0) return min;
+  if (q >= 1) return max;
+  if (n === 0) return u[0];
 
-  for (i=1; i<n; ++i) {
-    ub = u[i];
-    wb = w[i];
-    right = (wb * ua + wa * ub) / (wa + wb);
-
-    if (q < sum + wa) {
-      p = (q - sum) / wa;
-      return left * (1-p) + right * p;
-    }
-
-    sum += wa;
-    ua = ub;
-    wa = wb;
-    left = right;
-  }
-
-  right = max;
-  if (q < sum + wa) {
-    p = (q - sum) / wa;
-    return left * (1-p) + right * p;
-  } else {
-    return max;
-  }
+  // calculate boundaries, pick centroid via binary search
+  q = q * total;
+  i = bisect(c, q, 0, n+1);
+  if (i > 0) l = boundary(i-1, i, u, w);
+  if (i < n) r = boundary(i, i+1, u, w);
+  return l + (r-l) * (q - (c[i-1]||0)) / w[i];
 };
 
-// Query for fraction of values <= *v*.
+// Query the estimated cumulative distribution function.
+// In other words, query for the fraction of values <= *v*.
 proto.cdf = function(v) {
   this._mergeValues();
 
   var total = this._totalSum,
-      w = this._weight,
-      u = this._mean,
       n = this._last,
-      min = this._min,
-      max = this._max,
-      ua = min, ub, // means
-      wa = 0,   wb, // weights
-      sum = 0, left = 0, right, i;
+      u = this._mean,
+      w = this._weight,
+      c = this._mergeMean,
+      i, l, r, min, max;
 
-  if (n === 0) {
-    return w[n] === 0 ? NaN :
-      v < min ? 0 :
-      v > max ? 1 :
-      (max - min < EPSILON) ? 0.5 :
-      interpolate(v, min, max);
+  l = min = this._min;
+  r = max = this._max;
+  if (total === 0) return NaN;
+  if (v < min) return 0;
+  if (v > max) return 1;
+  if (n === 0) return interp(v, min, max);
+
+  // calculate boundaries, pick start point via binary search
+  i = bisect(u, v, 0, n+1);
+  if (i > 0) l = boundary(i-1, i, u, w);
+  if (i < n) r = boundary(i, i+1, u, w);
+  if (v < l) { // shift one interval if value exceeds boundary
+    r = l;
+    l = --i ? boundary(i-1, i, u, w) : min;
   }
-  if (w[n] > 0) ++n;
-
-  // find enclosing pair of centroids (treat min as a virtual centroid)
-  for (i=0; i<n; ++i) {
-    ub = u[i];
-    wb = w[i];
-    right = (ub - ua) * wa / (wa + wb);
-
-    // we know that v >= ua-left
-    if (v < ua + right) {
-      v = (sum + wa * interpolate(v, ua-left, ua+right)) / total;
-      return v > 0 ? v : 0;
-    }
-
-    sum += wa;
-    left = ub - (ua + right);
-    ua = ub;
-    wa = wb;
-  }
-
-  // for the last element, use max to determine right
-  right = max - ua;
-  return  (v < ua + right) ?
-    (sum + wa * interpolate(v, ua-left, ua+right)) / total :
-    1;
+  return ((c[i-1]||0) + w[i] * interp(v, l, r)) / total;
 };
+
+function bisect(a, x, lo, hi) {
+  while (lo < hi) {
+    var mid = lo + hi >>> 1;
+    if (a[mid] < x) { lo = mid + 1; }
+    else { hi = mid; }
+  }
+  return lo;
+}
+
+function boundary(i, j, u, w) {
+  return u[i] + (u[j] - u[i]) * w[i] / (w[i] + w[j]);
+}
+
+function interp(x, x0, x1) {
+  var denom = x1 - x0;
+  return denom > EPSILON ? (x - x0) / denom : 0.5;
+}
 
 // Union this t-digest with another.
 proto.union = function(td) {
@@ -279,11 +294,11 @@ proto.union = function(td) {
 proto.export = function() {
   this._mergeValues();
   return {
-    compress: this._cf,
-    min:      this._min,
-    max:      this._max,
-    mean:     [].slice.call(this._mean, 0, this._last+1),
-    weight:   [].slice.call(this._weight, 0, this._last+1)
+    centroids: this._nc,
+    min:       this._min,
+    max:       this._max,
+    mean:      [].slice.call(this._mean, 0, this._last+1),
+    weight:    [].slice.call(this._weight, 0, this._last+1)
   };
 };
 

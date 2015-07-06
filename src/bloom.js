@@ -4,10 +4,10 @@
 
 // This code borrows heavily from http://github.com/jasondavies/bloomfilter.js
 
-var hash = require('./hash');
+var arrays = require('./arrays'),
+    hash = require('./hash');
 
-var TYPED_ARRAYS = typeof ArrayBuffer !== 'undefined',
-    DEFAULT_BITS = 1024 * 1024 * 8, // 1MB
+var DEFAULT_BITS = 1024 * 1024 * 8, // 1MB
     DEFAULT_HASH = 5; // Optimal for 2% FPR over 1M elements
 
 // Create a new bloom filter. If *w* is an array-like object, with a length
@@ -27,14 +27,8 @@ function BloomFilter(w, d) {
   this._w = w = n * 32;
   this._d = d;
 
-  if (TYPED_ARRAYS) {
-    buckets = this._buckets = new Int32Array(n);
-    if (a) while (++i < n) buckets[i] = a[i];
-  } else {
-    buckets = this._buckets = [];
-    if (a) while (++i < n) buckets[i] = a[i];
-    else while (++i < n) buckets[i] = 0;
-  }
+  buckets = this._buckets = arrays.ints(n);
+  if (a) while (++i < n) buckets[i] = a[i];
   hash.init.call(this);
 }
 
@@ -100,7 +94,7 @@ proto.union = function(bf) {
   var a = this._buckets,
       b = bf._buckets,
       n = a.length,
-      z = TYPED_ARRAYS ? new Int32Array(n) : Array(n),
+      z = arrays.ints(n),
       i;
 
   for (i=0; i<n; ++i) {
