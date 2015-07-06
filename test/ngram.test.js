@@ -9,7 +9,7 @@ describe('n-gram sketch', function() {
   var str2 = 'bcbcefhikln';
 
   it('should count n-grams', function() {
-    var ng = new NGram(2);
+    var ng = new NGram();
     assert.equal(ng._n, 2);
     assert.equal(ng._case, false);
 
@@ -26,6 +26,8 @@ describe('n-gram sketch', function() {
     assert.equal(ng.norm(), Math.sqrt(13));
 
     ng.add(str2);
+    ng.add(null);
+    ng.add('');
     assert.equal(ng.query('bc'), 3);
     assert.equal(ng.query('ef'), 2);
     assert.equal(ng.query('hi'), 2);
@@ -46,6 +48,7 @@ describe('n-gram sketch', function() {
     assert.equal(ng.query('jk'), 0);
     assert.equal(ng.size(), 11);
     assert.equal(ng.norm(), Math.sqrt(11));
+    assert.equal(ng.norm(), Math.sqrt(11)); // repeat to hit cache
   });
 
   it('should compute dot product', function() {
@@ -53,6 +56,7 @@ describe('n-gram sketch', function() {
     var ng2 = new NGram(2); ng2.add(str2);
     assert.equal(ng1.dot(ng2), 4);
     assert.equal(ng1.cosine(ng2), 4 / (Math.sqrt(13) * Math.sqrt(12)));
+    assert.equal(ng1.cosine(new NGram()), 0);
   });
 
   it('should serialize and deserialize', function() {

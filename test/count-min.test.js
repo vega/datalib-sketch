@@ -11,6 +11,34 @@ describe('count-min sketch', function() {
   var set2 = 'klmnopqrst'.split('');
   var set3 = '0123456789'.split('');
 
+  it('should support constructors', function() {
+    var n = 100,
+        e = 0.001,
+        p = 0.001,
+        w = Math.ceil(n * Math.E / e),
+        d = Math.ceil(-Math.log(p)), cm1;
+
+    cm1 = CountMin.create();
+    assert.equal(cm1._w, Math.ceil(Math.E / e));
+    assert.equal(cm1._d, d);
+
+    cm1 = CountMin.create(n);
+    assert.equal(cm1._w, Math.ceil(n * Math.E));
+    assert.equal(cm1._d, d);
+
+    cm1 = CountMin.create(n, e);
+    assert.equal(cm1._w, w);
+    assert.equal(cm1._d, d);
+
+    cm1 = CountMin.create(n, e, p);
+    assert.equal(cm1._w, w);
+    assert.equal(cm1._d, d);
+
+    cm1 = new CountMin();
+    assert.isAbove(cm1._w, 0);
+    assert.isAbove(cm1._d, 0);
+  });
+
   it('should approximately model counts', function() {
     var cm = new CountMin(width, depth);
 
@@ -46,6 +74,9 @@ describe('count-min sketch', function() {
     assert.closeTo(10, cm1.dot(cm1), 10*EPSILON);
     assert.closeTo(20, cm2.dot(cm2), 10*EPSILON);
     assert.closeTo(10, cm1.dot(cm2), 10*EPSILON);
+
+    assert.throws(function() { cm1.dot(new CountMin(width+1, depth)); });
+    assert.throws(function() { cm1.dot(new CountMin(width, depth+1)); });
   });
 
   it('should serialize and deserialize', function() {

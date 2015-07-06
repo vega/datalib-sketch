@@ -12,7 +12,7 @@ describe('count-mean-min sketch', function() {
   var set3 = '0123456789'.split('');
 
   it('should approximately model counts', function() {
-    var cm = new CountMeanMin(width, depth);
+    var cm = new CountMeanMin(width, depth+1);
 
     set1.forEach(function(d) { cm.add(d); });
     set1.forEach(function(d) { cm.add(d); });
@@ -28,6 +28,11 @@ describe('count-mean-min sketch', function() {
     set3.forEach(function(d) {
       assert.closeTo(0, cm.query(d), EPSILON);
     });
+
+    cm = new CountMeanMin(2, 1);
+    cm.add('a');
+    cm._num = 0; // fudge internal count to force test coverage
+    assert.equal(cm.query('a'), 1);
   });
 
   it('should estimate dot product', function() {
@@ -46,6 +51,9 @@ describe('count-mean-min sketch', function() {
     assert.closeTo(10, cm1.dot(cm1), 10*EPSILON);
     assert.closeTo(20, cm2.dot(cm2), 10*EPSILON);
     assert.closeTo(10, cm1.dot(cm2), 10*EPSILON);
+
+    assert.throws(function() { cm1.dot(new CountMeanMin(width+1, depth)); });
+    assert.throws(function() { cm1.dot(new CountMeanMin(width, depth+1)); });
   });
 
   it('should serialize and deserialize', function() {
