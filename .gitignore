@@ -1,8 +1,9 @@
-_site
-node_modules
 .DS_Store
 .idea
-temp
+_site
 coverage
+node_modules
+temp
 datalib-sketch.js
+datalib-sketch.js.map
 datalib-sketch.min.js
