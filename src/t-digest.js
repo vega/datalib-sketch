@@ -17,8 +17,10 @@ var EPSILON = 1e-300,
 // Argument *n* is the approximate number of centroids, defaults to 100.
 function TDigest(n) {
   this._nc = n || DEFAULT_CENTROIDS;
-  var size = Math.ceil(this._nc * Math.PI/2);
-  
+
+  // Why this size? See https://github.com/vega/datalib-sketch/issues/3
+  var size = Math.ceil(this._nc * 2);
+
   this._totalSum = 0;
   this._last = 0;
   this._weight = arrays.floats(size);
@@ -80,7 +82,7 @@ proto.add = function(v, count) {
   if (v == null || v !== v) return; // ignore null, NaN
   count = count == null ? 1 : count;
   if (count <= 0) throw new Error('Count must be greater than zero.');
-  
+
   if (this._tempLast >= this._tempWeight.length) {
     this._mergeValues();
   }
