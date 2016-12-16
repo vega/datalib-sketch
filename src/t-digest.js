@@ -19,7 +19,7 @@ function TDigest(n) {
   this._nc = n || DEFAULT_CENTROIDS;
 
   // Why this size? See https://github.com/vega/datalib-sketch/issues/3
-  var size = Math.ceil(this._nc * 2);
+  var size = 2 * Math.ceil(this._nc);
 
   this._totalSum = 0;
   this._last = 0;
