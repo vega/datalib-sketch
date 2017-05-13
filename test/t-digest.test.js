@@ -123,4 +123,13 @@ describe('t-digest', function() {
     assert.deepEqual(td1.export(), td2.export());
   });
 
+  it('should not change state after deserialization', function () {
+    var t = new TDigest(100);
+    t.add(10);
+    t.add(20);
+    t.add(30);
+    var t2 = TDigest.import(t.export());
+    assert.equal(t.quantile(0.5), t2.quantile(0.5));
+  });
+
 });
