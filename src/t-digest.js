@@ -72,7 +72,7 @@ TDigest.import = function(obj) {
   td._tempLast = obj.tempLast;
   td._tempWeight = arrays.floats(obj.tempWeight);
   td._tempMean = arrays.floats(obj.tempMean);
-  td._order = obj.tempOrder;
+  td._order = obj.order;
 
   return td;
 };
@@ -315,7 +315,7 @@ proto.export = function () {
     tempLast: this._tempLast,
     tempWeight: Array.prototype.slice.call(this._tempWeight),
     tempMean: Array.prototype.slice.call(this._tempMean),
-    tempOrder: this._order
+    order: this._order
   };
 };
 
