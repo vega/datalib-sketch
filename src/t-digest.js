@@ -57,16 +57,23 @@ function numTemp(N) {
 
 // Create a new t-digest sketch from a serialized object.
 TDigest.import = function(obj) {
-  var td = new TDigest(obj.centroids);
-  var sum = 0;
+  var td = new TDigest();
+
+  td._nc = obj.nc;
+  td._totalSum = obj.totalSum;
+  td._last = obj.last;
+  td._weight = arrays.floats(obj.weight);
+  td._mean = arrays.floats(obj.mean);
   td._min = obj.min;
   td._max = obj.max;
-  td._last = obj.mean.length - 1;
-  for (var i=0, n=obj.mean.length; i<n; ++i) {
-    td._mean[i] = obj.mean[i];
-    sum += (td._weight[i] = obj.weight[i]);
-  }
-  td._totalSum = sum;
+  td._mergeWeight = arrays.floats(obj.mergeWeight);
+  td._mergeMean = arrays.floats(obj.mergeMean);
+  td._unmergedSum = obj.unmergedSum;
+  td._tempLast = obj.tempLast;
+  td._tempWeight = arrays.floats(obj.tempWeight);
+  td._tempMean = arrays.floats(obj.tempMean);
+  td._order = obj.tempOrder;
+
   return td;
 };
 
@@ -293,14 +300,22 @@ proto.union = function(td) {
 };
 
 // Return a JSON-compatible serialized version of this sketch.
-proto.export = function() {
-  this._mergeValues();
+proto.export = function () {
   return {
-    centroids: this._nc,
-    min:       this._min,
-    max:       this._max,
-    mean:      [].slice.call(this._mean, 0, this._last+1),
-    weight:    [].slice.call(this._weight, 0, this._last+1)
+    nc: this._nc,
+    totalSum: this._totalSum,
+    last: this._last,
+    weight: Array.prototype.slice.call(this._weight),
+    mean: Array.prototype.slice.call(this._mean),
+    min: this._min,
+    max: this._max,
+    mergeWeight: Array.prototype.slice.call(this._mergeWeight),
+    mergeMean: Array.prototype.slice.call(this._mergeMean),
+    unmergedSum: this._unmergedSum,
+    tempLast: this._tempLast,
+    tempWeight: Array.prototype.slice.call(this._tempWeight),
+    tempMean: Array.prototype.slice.call(this._tempMean),
+    tempOrder: this._order
   };
 };
 
